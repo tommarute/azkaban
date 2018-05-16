@@ -28,4 +28,6 @@ public interface Alerter {
   void alertOnFirstError(ExecutableFlow exflow) throws Exception;
 
   void alertOnSla(SlaOption slaOption, String slaMessage) throws Exception;
+
+  void alertOnEvictingError(ExecutableFlow exflow) throws Exception;
 }

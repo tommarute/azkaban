@@ -208,6 +208,39 @@ public class Emailer extends AbstractMailer implements Alerter {
     }
   }
 
+  public void sendEvictingErrorMessage(final ExecutableFlow flow) {
+      final EmailMessage message = new EmailMessage(this.mailHost, this.mailPort, this.mailUser,
+          this.mailPassword);
+      message.setFromAddress(this.mailSender);
+      message.setTLS(this.tls);
+      message.setAuth(super.hasMailAuth());
+
+      final ExecutionOptions option = flow.getExecutionOptions();
+
+      final MailCreator mailCreator =
+          DefaultMailCreator.getCreator(option.getMailCreator());
+
+      logger.debug("ExecutorMailer using mail creator:"
+          + mailCreator.getClass().getCanonicalName());
+
+      final boolean mailCreated =
+          mailCreator.createEvictingErrorMessage(flow, message, this.azkabanName, this.scheme,
+              this.clientHostname, this.clientPortNumber);
+
+      if (mailCreated && !this.testMode) {
+        try {
+          message.sendEmail();
+          logger.info("Sent evicting error email message for execution " + flow.getExecutionId());
+          this.commonMetrics.markSendEmailSuccess();
+        } catch (final Exception e) {
+          logger.error(
+            "Failed to send evicting error email message for execution "
+            + flow.getExecutionId(), e);
+          this.commonMetrics.markSendEmailFail();
+        }
+      }
+    }
+
   public void sendSuccessEmail(final ExecutableFlow flow) {
     final EmailMessage message = new EmailMessage(this.mailHost, this.mailPort, this.mailUser,
         this.mailPassword);
@@ -260,4 +293,10 @@ public class Emailer extends AbstractMailer implements Alerter {
       throws Exception {
     sendSlaAlertEmail(slaOption, slaMessage);
   }
+
+  @Override
+  public void alertOnEvictingError(final ExecutableFlow exflow) throws Exception {
+    sendEvictingErrorMessage(exflow);
+  }
+
 }

@@ -31,6 +31,7 @@ import azkaban.utils.FileIOUtils.LogData;
 import azkaban.utils.JSONUtils;
 import azkaban.utils.Pair;
 import azkaban.utils.Props;
+import azkaban.ServiceProvider;
 import com.google.common.collect.Lists;
 import java.io.File;
 import java.io.IOException;
@@ -1421,6 +1422,7 @@ public class ExecutorManager extends EventHandler implements
     private final int numErrors = 6;
     private final long errorThreshold = 10000;
     private boolean shutdown = false;
+    private AlerterHolder alerters;
 
     public ExecutingManagerUpdaterThread() {
       this.setName("ExecutorManagerUpdaterThread");
@@ -1471,6 +1473,7 @@ public class ExecutorManager extends EventHandler implements
                       JSONUtils.toJSON(executionIdsList));
 
               Map<String, Object> results = null;
+              boolean alertUser = true;
               try {
                 results =
                     ExecutorManager.this.apiGateway.callWithExecutionId(executor.getHost(),
@@ -1497,6 +1500,23 @@ public class ExecutorManager extends EventHandler implements
                       logger.error("Evicting flow " + flow.getExecutionId()
                           + ". The executor is unresponsive.");
                       // TODO should send out an unresponsive email here.
+                      logger.debug("Check alertUser: " + alertUser);
+                      if (alertUser) {
+                        ExecutionOptions options = flow.getExecutionOptions();
+                        this.alerters = ServiceProvider.SERVICE_PROVIDER.getInstance(AlerterHolder.class);
+                        final Alerter mailAlerter = this.alerters.get("email");
+                        logger.debug("Email will be sent due to executor is unresponsive");
+                        logger.debug("Checkt options.getFailureEmails(): " + options.getFailureEmails());
+                        logger.debug("Check options.getFailureEmails().isEmpty(): " + options.getFailureEmails().isEmpty());
+                        if (options.getFailureEmails() != null && !options.getFailureEmails().isEmpty()) {
+                          try {
+                            logger.debug("Send email due to executor is unresponsive");
+                            mailAlerter.alertOnEvictingError(flow);
+                          } catch (final Exception ex) {
+                            logger.error(ex);
+                          }
+                        }
+                      }
                       finalizeFlows.add(pair.getSecond());
                     }
                   }

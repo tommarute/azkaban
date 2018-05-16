@@ -217,4 +217,59 @@ public class DefaultMailCreator implements MailCreator {
     }
     return false;
   }
+
+  @Override
+  public boolean createEvictingErrorMessage(final ExecutableFlow flow, final EmailMessage message,
+      final String azkabanName, final String scheme, final String clientHostname,
+      final String clientPortNumber, final String... vars) {
+
+    final ExecutionOptions option = flow.getExecutionOptions();
+
+    final List<String> emailList = option.getFailureEmails();
+    final int execId = flow.getExecutionId();
+
+    if (emailList != null && !emailList.isEmpty()) {
+      message.addAllToAddress(emailList);
+      message.setMimeType("text/html");
+      message.setSubject("Flow '" + flow.getFlowId() + "' has evicted on "
+          + azkabanName);
+
+      message.println("<h2 style=\"color:#FF0000\"> Execution '" + execId
+          + "' of flow '" + flow.getFlowId() + "' of project '"
+          + flow.getProjectName() + "' has failed on " + azkabanName + "</h2>");
+      message.println("<table>");
+      message.println("<tr><td>Start Time</td><td>"
+          + convertMSToString(flow.getStartTime()) + "</td></tr>");
+      message.println("<tr><td>End Time</td><td>"
+          + convertMSToString(flow.getEndTime()) + "</td></tr>");
+      message.println("<tr><td>Duration</td><td>"
+          + Utils.formatDuration(flow.getStartTime(), flow.getEndTime())
+          + "</td></tr>");
+      message.println("<tr><td>Status</td><td>" + flow.getStatus() + "</td></tr>");
+      message.println("</table>");
+      message.println("");
+      final String executionUrl =
+          scheme + "://" + clientHostname + ":" + clientPortNumber + "/"
+              + "executor?" + "execid=" + execId;
+      message.println("<a href=\"" + executionUrl + "\">" + flow.getFlowId()
+          + " Execution Link</a>");
+
+      message.println("");
+      message.println("<h3>Reason</h3>");
+      final List<String> failedJobs = Emailer.findFailedJobs(flow);
+      message.println("<ul>");
+      for (final String jobId : failedJobs) {
+        message.println("<li><a href=\"" + executionUrl + "&job=" + jobId
+            + "\">Failed job '" + jobId + "' Link</a></li>");
+      }
+      for (final String reasons : vars) {
+        message.println("<li>" + reasons + "</li>");
+      }
+
+      message.println("</ul>");
+      return true;
+    }
+    return false;
+  }
+
 }
